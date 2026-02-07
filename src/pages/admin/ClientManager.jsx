@@ -1,8 +1,8 @@
-import { useState, useEffect } from 'react';
-import { supabase } from '../../lib/supabaseClient';
-import { Users, Search, UserPlus, Shield, Mail, Edit3, Trash2, Key, Calendar, X as CloseIcon, Save, Loader2 as LoaderIcon, Wand2, ChevronRight, Dumbbell, Clock, Layers, Plus, Zap } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { AnimatePresence, motion } from 'framer-motion';
+import { ChevronRight, X as CloseIcon, Edit3, Loader2 as LoaderIcon, Save, Search, Trash2, UserPlus, Zap } from 'lucide-react';
+import { useEffect, useState } from 'react';
 import Swal from 'sweetalert2';
+import { supabase } from '../../lib/supabaseClient';
 
 const ClientManager = () => {
   const [clients, setClients] = useState([]);
@@ -528,7 +528,25 @@ const ClientManager = () => {
                             onClick={e => e.stopPropagation()}
                           >
                             <option value="none">-- DESCANSO --</option>
-                            {routines.map(r => <option key={r.id} value={r.id}>{(r.title || 'Sin Título').toUpperCase()} {!r.is_template ? '⭐' : ''}</option>)}
+                            {routines
+                              .filter(r => {
+                                // FILTRO DE DESCANSOS:
+                                // Si la rutina es de Descanso, solo mostrarla si coincide con el día de la fila (ej: Lunes)
+                                if (r.title && r.title.toUpperCase().includes('DESCANSO')) {
+                                  // Normalizamos para comparar (removemos acentos si es necesario, aunque el script SQL uso nombres base)
+                                  const routineTitle = r.title.toUpperCase();
+                                  const currentDay = day.toUpperCase(); // Lunes -> LUNES
+                                  
+                                  // Quitamos acentos básicos por si acaso (Sábado -> SABADO)
+                                  const currentDayNorm = currentDay.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+                                  const routineTitleNorm = routineTitle.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+
+                                  return routineTitleNorm.includes(currentDayNorm);
+                                }
+                                return true; // Mostrar el resto de rutinas siempre
+                              })
+                              .map(r => <option key={r.id} value={r.id}>{(r.title || 'Sin Título').toUpperCase()} {!r.is_template ? '⭐' : ''}</option>)
+                            }
                           </select>
                           <ChevronRight size={14} className={`transition-transform ${expandedDay === day ? 'rotate-90 text-primary' : ''}`} />
                         </div>
