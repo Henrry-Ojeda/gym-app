@@ -182,6 +182,11 @@ const UserDashboard = ({ user, onLogout }) => {
     </div>
   );
 
+  const isExpired = !user.subscription_expires_at || new Date(user.subscription_expires_at) < new Date();
+
+  // Si está vencido y no está en chat o perfil, lo mandamos a un estado de bloqueo
+  const isBlocked = isExpired && activeTab !== 'chat';
+
   return (
     <div className="min-h-screen bg-black text-white pb-32 font-inter">
       {/* Header Premium */}
@@ -212,7 +217,34 @@ const UserDashboard = ({ user, onLogout }) => {
 
       <main className="px-6 py-8">
         <AnimatePresence mode="wait">
-          {activeTab === 'home' && (
+          {isBlocked ? (
+            <motion.div 
+              key="blocked"
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="flex flex-col items-center justify-center p-10 card-dark border-red-500/20 bg-gradient-to-b from-red-500/10 to-transparent min-h-[400px] text-center"
+            >
+              <div className="w-20 h-20 rounded-[2rem] bg-red-500/20 flex items-center justify-center mb-6 border border-red-500/30">
+                <CreditCard size={40} className="text-red-500" />
+              </div>
+              <h3 className="text-3xl font-black italic uppercase tracking-tighter text-white mb-2">MEMBRESÍA <span className="text-red-500">VENCIDA</span></h3>
+              <p className="text-gray-400 text-sm max-w-xs leading-relaxed mb-8">
+                Tu acceso a los planes de entrenamiento ha expirado. Para continuar con tu progreso, por favor regulariza tu mensualidad.
+              </p>
+              
+              <div className="space-y-4 w-full max-w-xs">
+                <button 
+                  onClick={() => setActiveTab('chat')}
+                  className="w-full py-4 bg-primary text-black font-black uppercase text-[10px] tracking-widest rounded-2xl flex items-center justify-center gap-2 hover:scale-105 transition-all shadow-xl shadow-primary/20"
+                >
+                  <MessageCircle size={18} /> NOTIFICAR PAGO POR CHAT
+                </button>
+                <p className="text-[9px] text-gray-600 font-bold uppercase tracking-widest italic">
+                  *Solo el chat permanece activo para soporte
+                </p>
+              </div>
+            </motion.div>
+          ) : activeTab === 'home' && (
             <motion.div 
               key="home"
               initial={{ opacity: 0, y: 10 }}
@@ -560,7 +592,8 @@ const UserDashboard = ({ user, onLogout }) => {
           icon={<Dumbbell size={22} />} 
           active={activeTab === 'home'} 
           label="MIS RUTINAS" 
-          onClick={() => setActiveTab('home')}
+          disabled={isExpired}
+          onClick={() => !isExpired && setActiveTab('home')}
         />
         <NavIcon 
           icon={<MessageCircle size={22} />} 
@@ -576,23 +609,26 @@ const UserDashboard = ({ user, onLogout }) => {
           icon={<CreditCard size={22} />} 
           active={activeTab === 'subscription'} 
           label="MEMBRESÍA" 
-          onClick={() => setActiveTab('subscription')}
+          disabled={isExpired}
+          onClick={() => !isExpired && setActiveTab('subscription')}
         />
         <NavIcon 
           icon={<User size={22} />} 
           active={activeTab === 'profile'}
           label="PERFIL" 
-          onClick={() => setActiveTab('profile')}
+          disabled={isExpired}
+          onClick={() => !isExpired && setActiveTab('profile')}
         />
       </nav>
     </div>
   );
 };
 
-const NavIcon = ({ icon, active, label, onClick, badge }) => (
+const NavIcon = ({ icon, active, label, onClick, badge, disabled }) => (
   <button 
     onClick={onClick}
-    className={`flex-1 flex flex-col items-center gap-1.5 transition-all outline-none group relative ${active ? 'text-primary' : 'text-gray-500 hover:text-gray-300'}`}
+    disabled={disabled}
+    className={`flex-1 flex flex-col items-center gap-1.5 transition-all outline-none group relative ${disabled ? 'opacity-20 cursor-not-allowed grayscale' : active ? 'text-primary' : 'text-gray-500 hover:text-gray-300'}`}
   >
     <div className={`w-12 h-12 rounded-2xl transition-all flex items-center justify-center ${active ? 'bg-primary/20 scale-110 shadow-lg shadow-primary/5' : 'group-hover:bg-white/5'}`}>
       {icon}

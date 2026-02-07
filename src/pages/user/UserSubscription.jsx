@@ -85,6 +85,27 @@ const UserSubscription = ({ user }) => {
         })}
       </div>
 
+      {user.subscription_expires_at && (
+        <div className="bg-dark-900 border border-white/5 rounded-3xl p-6 flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center text-primary border border-primary/20">
+              <Clock size={22} />
+            </div>
+            <div>
+              <p className="text-[10px] font-black uppercase text-gray-500 tracking-widest mb-1">Próximo Vencimiento</p>
+              <p className="text-lg font-black italic uppercase text-white tracking-tighter">
+                {new Date(user.subscription_expires_at).toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' })}
+              </p>
+            </div>
+          </div>
+          <div className="hidden md:block text-right">
+             <span className={`text-[10px] font-black px-3 py-1 rounded-full border ${new Date(user.subscription_expires_at) < new Date() ? 'bg-red-500/10 border-red-500/20 text-red-500' : 'bg-primary/10 border-primary/20 text-primary'}`}>
+               {new Date(user.subscription_expires_at) < new Date() ? 'CUENTA CONGELADA' : 'ESTADO: ACTIVO'}
+             </span>
+          </div>
+        </div>
+      )}
+
       <div className="bg-primary/5 border border-primary/20 rounded-3xl p-6 flex items-start gap-4">
         <div className="w-10 h-10 rounded-2xl bg-primary/20 flex items-center justify-center text-primary flex-shrink-0">
           <ShieldCheck size={20} />

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabaseClient';
-import { Users, Search, UserPlus, Shield, Mail, Edit3, Trash2, Key, Calendar, X as CloseIcon, Save, Loader2 as LoaderIcon, Wand2, ChevronRight, Dumbbell, Clock, Layers, Plus } from 'lucide-react';
+import { Users, Search, UserPlus, Shield, Mail, Edit3, Trash2, Key, Calendar, X as CloseIcon, Save, Loader2 as LoaderIcon, Wand2, ChevronRight, Dumbbell, Clock, Layers, Plus, Zap } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Swal from 'sweetalert2';
 
@@ -15,6 +15,7 @@ const ClientManager = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedClient, setSelectedClient] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
+  const [activeView, setActiveView] = useState('all'); // 'all', 'expiring'
   const [weeklySchedule, setWeeklySchedule] = useState({}); // { 'Lunes': routine_id }
   const [dayExercises, setDayExercises] = useState({}); // { 'Lunes': [exercises] }
   const [expandedDay, setExpandedDay] = useState(null);
@@ -185,7 +186,8 @@ const ClientManager = () => {
       last_name: formData.get('last_name'),
       role: formData.get('role'),
       current_level_id: formData.get('current_level_id') || null,
-      subscription_id: formData.get('subscription_id') || null
+      subscription_id: formData.get('subscription_id') || null,
+      subscription_expires_at: formData.get('subscription_expires_at') || null
     };
 
     try {
@@ -291,22 +293,100 @@ const ClientManager = () => {
     }
   };
 
+  const handleBulkRenew = async (targetClients) => {
+    const nextMonthFirst = new Date();
+    nextMonthFirst.setMonth(nextMonthFirst.getMonth() + 1);
+    nextMonthFirst.setDate(1);
+    // Formato YYYY-MM-DD para compatibilidad total con columnas DATE
+    const dateStr = nextMonthFirst.toISOString().split('T')[0];
+
+    const { isConfirmed } = await Swal.fire({
+      title: 'Renovación Masiva',
+      text: `¿Renovar a ${targetClients.length} usuarios hasta el 1 de ${nextMonthFirst.toLocaleDateString('es-ES', {month: 'long'})}?`,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#bcff00',
+      background: '#121212',
+      color: '#fff'
+    });
+
+    if (!isConfirmed) return;
+
+    setLoading(true);
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ subscription_expires_at: dateStr })
+        .in('id', targetClients.map(c => c.id));
+      
+      if (error) throw error;
+      fetchClients();
+      Swal.fire({ title: '¡Renovados!', icon: 'success', toast: true, position: 'top-end', showConfirmButton: false, timer: 2000, background: '#121212', color: '#fff' });
+    } catch (err) {
+      console.error(err);
+      Swal.fire({ 
+        title: 'Error', 
+        text: `No se pudo realizar la renovación: ${err.message || 'Error desconocido'}`, 
+        icon: 'error', 
+        background: '#121212', 
+        color: '#fff' 
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const filteredClients = clients.filter(c => {
+    const matchesSearch = `${c.first_name} ${c.last_name} ${c.email}`.toLowerCase().includes(searchQuery.toLowerCase());
+    if (activeView === 'expiring') {
+      const isExpired = !c.subscription_expires_at || new Date(c.subscription_expires_at) < new Date();
+      return matchesSearch && isExpired && c.role === 'user';
+    }
+    return matchesSearch;
+  });
+
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center gap-4">
-        <div className="relative flex-1 max-w-md">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={18} />
-          <input 
-            type="text" 
-            placeholder="Buscar..."
-            className="w-full bg-dark-900 border border-dark-700 rounded-xl py-3 pl-10 pr-4 outline-none focus:border-primary transition-all"
-            value={searchQuery}
-            onChange={e => setSearchQuery(e.target.value)}
-          />
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div className="flex bg-dark-900 p-1 rounded-xl border border-dark-700">
+          <button 
+            onClick={() => setActiveView('all')}
+            className={`px-4 py-2 text-[10px] font-black uppercase tracking-widest rounded-lg transition-all ${activeView === 'all' ? 'bg-primary text-black' : 'text-gray-500 hover:text-white'}`}
+          >
+            Todos
+          </button>
+          <button 
+            onClick={() => setActiveView('expiring')}
+            className={`px-4 py-2 text-[10px] font-black uppercase tracking-widest rounded-lg transition-all flex items-center gap-2 ${activeView === 'expiring' ? 'bg-red-500 text-white' : 'text-gray-500 hover:text-white'}`}
+          >
+            Vencidos / Sin Fecha {clients.filter(c => c.role === 'user' && (!c.subscription_expires_at || new Date(c.subscription_expires_at) < new Date())).length > 0 && <span className="w-2 h-2 bg-white rounded-full animate-pulse" />}
+          </button>
         </div>
-        <button onClick={() => { setIsEditing(false); setSelectedClient(null); setIsModalOpen(true); }} className="btn-primary flex items-center gap-2">
-          <UserPlus size={20} /> NUEVO CLIENTE
-        </button>
+
+        <div className="flex gap-2 w-full md:w-auto">
+          {activeView === 'expiring' && filteredClients.length > 0 && (
+            <button 
+              onClick={() => handleBulkRenew(filteredClients)}
+              className="flex-1 md:flex-none px-4 py-3 bg-white/10 hover:bg-white/20 border border-white/10 rounded-xl text-[10px] font-black uppercase tracking-widest text-primary flex items-center justify-center gap-2 transition-all"
+            >
+              <Zap size={14} /> RENOVAR LISTA
+            </button>
+          )}
+          <button onClick={() => { setIsEditing(false); setSelectedClient(null); setIsModalOpen(true); }} className="flex-1 md:flex-none btn-primary flex items-center justify-center gap-2 px-6">
+            <UserPlus size={20} /> NUEVO
+          </button>
+        </div>
+      </div>
+
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={18} />
+        <input 
+          type="text" 
+          placeholder="Buscar atleta por nombre o email..."
+          className="w-full bg-dark-900 border border-dark-700 rounded-xl py-3 pl-10 pr-4 outline-none focus:border-primary transition-all font-medium"
+          value={searchQuery}
+          onChange={e => setSearchQuery(e.target.value)}
+        />
       </div>
 
       <div className="card-dark overflow-hidden p-0">
@@ -314,12 +394,12 @@ const ClientManager = () => {
           <thead>
             <tr className="bg-dark-800/50 border-b border-dark-700 text-xs text-gray-400 uppercase tracking-widest">
               <th className="p-4">Cliente</th>
-              <th className="p-4">Status</th>
+              <th className="p-4">Status / Vencimiento</th>
               <th className="p-4 text-right">Acciones</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-dark-700">
-            {clients.filter(c => c.first_name?.toLowerCase().includes(searchQuery.toLowerCase())).map(client => (
+            {filteredClients.map(client => (
               <tr key={client.id} className="hover:bg-primary/5 transition-colors">
                 <td className="p-4 flex items-center gap-3">
                   <div className="w-10 h-10 rounded-full bg-dark-800 flex items-center justify-center font-bold text-primary italic border border-dark-700">
@@ -331,9 +411,15 @@ const ClientManager = () => {
                   </div>
                 </td>
                 <td className="p-4">
-                  <span className="text-[10px] font-black uppercase text-primary px-2 py-0.5 bg-primary/10 rounded-lg border border-primary/20">
+                  <span className="text-[10px] font-black uppercase text-primary px-2 py-0.5 bg-primary/10 rounded-lg border border-primary/20 block w-fit">
                     {client.subscription?.name || 'SIN PLAN'}
                   </span>
+                  {client.subscription_expires_at && (
+                    <span className={`text-[8px] font-bold uppercase mt-1 block ${new Date(client.subscription_expires_at) < new Date() ? 'text-red-500' : 'text-gray-500'}`}>
+                      {new Date(client.subscription_expires_at) < new Date() ? 'VENCIDO: ' : 'VENCE: '}
+                      {new Date(client.subscription_expires_at).toLocaleDateString()}
+                    </span>
+                  )}
                 </td>
                 <td className="p-4 text-right">
                   <div className="flex justify-end gap-2">
@@ -404,6 +490,15 @@ const ClientManager = () => {
                         <option value="">-- SIN SUSCRIPCIÓN --</option>
                         {subscriptions.map(s => <option key={s.id} value={s.id}>{s.name} (${s.price})</option>)}
                       </select>
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold text-gray-500 uppercase font-black text-primary">Vencimiento de Mensualidad</label>
+                      <input 
+                        type="date" 
+                        name="subscription_expires_at" 
+                        defaultValue={selectedClient?.subscription_expires_at ? new Date(selectedClient.subscription_expires_at).toISOString().split('T')[0] : ''} 
+                        className="w-full bg-dark-900 border border-dark-700 rounded-lg p-2 text-sm text-white font-bold" 
+                      />
                     </div>
                   </form>
                 </div>

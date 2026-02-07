@@ -30,7 +30,11 @@ const Register = () => {
             role: 'user',
             subscription_status: 'active',
             current_level_id: '5a6a673a-d642-471f-b9e1-5f802ac585f9', // PRINCIPIANTE
-            subscription_id: 'b7c2d2ff-62a8-4e9c-b1e4-d84ddb628468' // BASIC
+            subscription_id: 'b7c2d2ff-62a8-4e9c-b1e4-d84ddb628468', // BASIC
+            subscription_expires_at: (() => {
+              const now = new Date();
+              return new Date(now.getFullYear(), now.getMonth() + 1, 1).toISOString();
+            })()
           }
         }
       });
