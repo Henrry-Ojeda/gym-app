@@ -19,11 +19,10 @@ const AdminChatManager = ({ adminUser }) => {
       .select('id, first_name, last_name, email, avatar_url')
       .order('first_name', { ascending: true });
 
-    // 2. Obtener los chats existentes ordenados por última actividad
+    // 2. Obtener los chats existentes (todos los admins ven todos los chats para cobertura total)
     const { data: chatsData } = await supabase
       .from('chats')
       .select('*')
-      .eq('admin_id', adminUser.id)
       .order('updated_at', { ascending: false });
 
     // 3. Obtener conteo de mensajes no leídos para cada chat
@@ -40,7 +39,7 @@ const AdminChatManager = ({ adminUser }) => {
           .from('messages')
           .select('*', { count: 'exact', head: true })
           .eq('chat_id', chat.id)
-          .neq('sender_id', adminUser.id)
+          .eq('sender_id', chat.client_id) // Si el emisor es el cliente, es un mensaje para nosotros (admins)
           .eq('is_read', false);
         
         counts[chat.id] = count || 0;
@@ -64,12 +63,16 @@ const AdminChatManager = ({ adminUser }) => {
         schema: 'public', 
         table: 'messages' 
       }, (payload) => {
-        // Si el mensaje no es del admin y el chat no está seleccionado, incrementar contador
+        // Si el mensaje es del cliente, incrementar contador si no tenemos el chat abierto
         if (payload.new.sender_id !== adminUser.id && payload.new.chat_id !== selectedChat?.id) {
-          setUnreadCounts(prev => ({
-            ...prev,
-            [payload.new.chat_id]: (prev[payload.new.chat_id] || 0) + 1
-          }));
+          // Buscamos el chat para ver si el sender es el cliente de este chat
+          const chat = chats.find(c => c.id === payload.new.chat_id);
+          if (chat && payload.new.sender_id === chat.client_id) {
+            setUnreadCounts(prev => ({
+              ...prev,
+              [payload.new.chat_id]: (prev[payload.new.chat_id] || 0) + 1
+            }));
+          }
         }
         // Refrescar lista de chats para ver el último mensaje actualizado
         fetchData();
@@ -142,8 +145,7 @@ const AdminChatManager = ({ adminUser }) => {
         .from('messages')
         .update({ is_read: true })
         .eq('chat_id', chatId)
-        .neq('sender_id', adminUser.id)
-        .eq('is_read', false);
+        .neq('is_read', true); // Marcar todos los que no estén leídos como leídos al abrir el chat
       
       if (error) throw error;
       return true;

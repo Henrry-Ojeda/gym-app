@@ -141,6 +141,16 @@ const Chat = ({ chatId, currentUser }) => {
           updated_at: new Date().toISOString()
         })
         .eq('id', chatId);
+
+      // 3. Si soy admin, marcar todo lo del cliente como leído al responder
+      const isUserAdmin = ['admin', 'admin-user'].includes(currentUser?.role);
+      if (isUserAdmin) {
+        await supabase
+          .from('messages')
+          .update({ is_read: true })
+          .eq('chat_id', chatId)
+          .eq('is_read', false);
+      }
       
       scrollToBottom();
     } catch (error) {
