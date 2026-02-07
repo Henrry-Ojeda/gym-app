@@ -214,12 +214,54 @@ const ClientManager = () => {
           
           if (insertError) throw insertError;
         }
+      } else {
+        // CREACION DE NUEVO USUARIO
+        const email = formData.get('email');
+        const password = formData.get('password');
+        
+        if (!email || !password) {
+          throw new Error("Email y contraseña son obligatorios");
+        }
+
+        const { data: authData, error: authError } = await supabase.auth.signUp({
+          email,
+          password,
+          options: {
+            data: {
+              first_name: clientData.first_name,
+              last_name: clientData.last_name,
+              role: clientData.role
+            }
+          }
+        });
+
+        if (authError) throw authError;
+
+        if (authData.user) {
+          // Crear perfil completo (el trigger de supabase a veces no tiene acceso a level/subscription)
+          const { error: profileError } = await supabase
+            .from('profiles')
+            .upsert({
+              id: authData.user.id,
+              email: email,
+              ...clientData
+            });
+          
+          if (profileError) throw profileError;
+        }
       }
       setIsModalOpen(false);
       fetchClients();
       Swal.fire({ title: '¡Guardado!', icon: 'success', background: '#121212', color: '#fff', timer: 1500, showConfirmButton: false });
     } catch (err) {
       console.error(err);
+      Swal.fire({
+        title: 'Error al Guardar',
+        text: err.message || 'No se pudo procesar la solicitud. Verifica los datos.',
+        icon: 'error',
+        background: '#121212',
+        color: '#fff'
+      });
     } finally {
       setLoading(false);
     }

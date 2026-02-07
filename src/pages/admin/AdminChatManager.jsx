@@ -115,30 +115,42 @@ const AdminChatManager = ({ adminUser }) => {
       
       if (!error) {
         chat = data;
-        setChats(prev => [...prev, data]);
+        setChats(prev => [data, ...prev]);
       }
     }
-    
-    setSelectedChat({ ...chat, profiles: client });
-    setIsSelecting(false);
-    
-    // Limpiar contador de no leídos localmente al abrir el chat
-    setUnreadCounts(prev => ({
-      ...prev,
-      [chat.id]: 0
-    }));
 
-    // Marcar como leídos en la base de datos
-    markChatAsRead(chat.id);
+    if (chat) {
+      // 1. Marcar como leídos en la base de datos PRIMERO
+      // para que cuando fetchData corra (por el cambio de selectedChat), la DB ya esté limpia
+      await markChatAsRead(chat.id);
+      
+      // 2. Limpiar contador localmente inmediatamente
+      setUnreadCounts(prev => ({
+        ...prev,
+        [chat.id]: 0
+      }));
+
+      // 3. Cambiar el chat seleccionado
+      setSelectedChat({ ...chat, profiles: client });
+      setIsSelecting(false);
+    }
   };
 
   const markChatAsRead = async (chatId) => {
-    await supabase
-      .from('messages')
-      .update({ is_read: true })
-      .eq('chat_id', chatId)
-      .neq('sender_id', adminUser.id)
-      .eq('is_read', false);
+    try {
+      const { error } = await supabase
+        .from('messages')
+        .update({ is_read: true })
+        .eq('chat_id', chatId)
+        .neq('sender_id', adminUser.id)
+        .eq('is_read', false);
+      
+      if (error) throw error;
+      return true;
+    } catch (err) {
+      console.error("Error marking as read:", err);
+      return false;
+    }
   };
 
   if (loading) return (
