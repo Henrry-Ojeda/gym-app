@@ -394,6 +394,7 @@ const ClientManager = () => {
           <thead>
             <tr className="bg-dark-800/50 border-b border-dark-700 text-xs text-gray-400 uppercase tracking-widest">
               <th className="p-4">Cliente</th>
+              <th className="p-4">Rol / Nivel</th>
               <th className="p-4">Status / Vencimiento</th>
               <th className="p-4 text-right">Acciones</th>
             </tr>
@@ -408,6 +409,16 @@ const ClientManager = () => {
                   <div>
                     <p className="font-bold text-sm tracking-tight">{client.first_name} {client.last_name}</p>
                     <p className="text-xs text-gray-500">{client.email}</p>
+                  </div>
+                </td>
+                <td className="p-4">
+                  <div className="flex flex-col gap-1">
+                    <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded w-fit ${client.role === 'admin' ? 'bg-purple-500/20 text-purple-400 border border-purple-500/30' : 'bg-gray-700/30 text-gray-400 border border-gray-700/50'}`}>
+                      {client.role || 'USER'}
+                    </span>
+                    <span className="text-[10px] font-bold text-primary uppercase">
+                       {levels.find(l => l.id === client.current_level_id)?.name || 'SIN NIVEL'}
+                    </span>
                   </div>
                 </td>
                 <td className="p-4">
