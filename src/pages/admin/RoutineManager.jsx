@@ -5,7 +5,6 @@ import { motion, AnimatePresence } from 'framer-motion';
 import Swal from 'sweetalert2';
 import ExerciseManager from './ExerciseManager';
 import CategoryManager from './CategoryManager';
-import LevelManager from './LevelManager';
 
 const RoutineManager = ({ activeRoutineSubTab = 'programs' }) => {
   const [routines, setRoutines] = useState([]);
@@ -527,7 +526,6 @@ const RoutineManager = ({ activeRoutineSubTab = 'programs' }) => {
 
       {activeRoutineSubTab === 'exercises' && <ExerciseManager />}
       {activeRoutineSubTab === 'categories' && <CategoryManager />}
-      {activeRoutineSubTab === 'levels' && <LevelManager />}
     </div>
   );
 };

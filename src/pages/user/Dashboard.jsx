@@ -1,17 +1,71 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Home, Dumbbell, MessageCircle, User, Activity, Play, LogOut, Clock, CreditCard, Sparkles, Loader2 } from 'lucide-react';
+import { Home, Dumbbell, MessageCircle, User, Activity, Play, LogOut, Clock, CreditCard, Sparkles, Loader2, X, CheckCircle2 } from 'lucide-react';
 import { supabase } from '../../lib/supabaseClient';
 import UserChat from './UserChat';
 import UserSubscription from './UserSubscription';
+import ProfileManager from '../../components/ProfileManager';
 
 const UserDashboard = ({ user, onLogout }) => {
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('home'); // 'home', 'chat', 'subscription'
+  const [activeTab, setActiveTab] = useState('home'); // 'home', 'chat', 'subscription', 'profile'
   const [weeklySchedule, setWeeklySchedule] = useState({});
   const [todayRoutine, setTodayRoutine] = useState(null);
   const [currentDay, setCurrentDay] = useState('');
   const [unreadCount, setUnreadCount] = useState(0);
+  const [workoutMode, setWorkoutMode] = useState(() => localStorage.getItem('gym_workout_active') === 'true');
+  const [completedExercises, setCompletedExercises] = useState(() => {
+    const saved = localStorage.getItem('gym_workout_progress');
+    return saved ? JSON.parse(saved) : [];
+  });
+  const [activeVideo, setActiveVideo] = useState(null);
+
+  useEffect(() => {
+    localStorage.setItem('gym_workout_active', workoutMode);
+    if (!workoutMode) {
+      // Opcional: Podrías querer mantener el progreso aunque cierres el overlay, 
+      // pero por ahora limpiamos si no está en modo entrenamiento para evitar basura
+    }
+  }, [workoutMode]);
+
+  useEffect(() => {
+    localStorage.setItem('gym_workout_progress', JSON.stringify(completedExercises));
+  }, [completedExercises]);
+
+  const toggleExercise = (id) => {
+    setCompletedExercises(prev => 
+      prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]
+    );
+  };
+
+  const finishWorkout = () => {
+    Swal.fire({
+      title: '¡Buen trabajo!',
+      text: 'Has completado tu sesión de hoy.',
+      icon: 'success',
+      background: '#121212',
+      color: '#fff',
+      confirmButtonText: 'CERRAR',
+      confirmButtonColor: '#bcff00'
+    });
+    setWorkoutMode(false);
+    setCompletedExercises([]);
+    localStorage.removeItem('gym_workout_progress');
+    localStorage.removeItem('gym_workout_active');
+  };
+
+  const fetchUpdatedUser = async () => {
+    // Esto refresca los datos del usuario localmente después de un cambio de perfil
+    const { data: { user: authUser } } = await supabase.auth.getUser();
+    if (authUser) {
+      const { data } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', authUser.id)
+        .single();
+      if (data) Object.assign(user, data);
+    }
+  };
 
   useEffect(() => {
     fetchUserData();
@@ -204,7 +258,10 @@ const UserDashboard = ({ user, onLogout }) => {
                         </div>
                       </div>
 
-                      <button className="btn-primary w-full flex items-center justify-center gap-3 py-5 group shadow-2xl shadow-primary/10">
+                      <button 
+                        onClick={() => setWorkoutMode(true)}
+                        className="btn-primary w-full flex items-center justify-center gap-3 py-5 group shadow-2xl shadow-primary/10"
+                      >
                         <Play fill="black" size={22} className="group-hover:scale-110 transition-transform" /> 
                         <span className="text-sm font-black tracking-tight italic uppercase">INICIAR ENTRENAMIENTO</span>
                       </button>
@@ -260,6 +317,205 @@ const UserDashboard = ({ user, onLogout }) => {
                   })}
                 </div>
               </section>
+
+              {/* Workout Session Overlay */}
+              <AnimatePresence>
+                {workoutMode && todayRoutine && (
+                  <motion.div 
+                    initial={{ y: '100%' }}
+                    animate={{ y: 0 }}
+                    exit={{ y: '100%' }}
+                    transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+                    className="fixed inset-0 z-[100] bg-black flex flex-col pt-safe px-6 overflow-hidden"
+                  >
+                    {/* Header Workout */}
+                    <div className="py-6 flex justify-between items-center bg-black">
+                      <div>
+                        <p className="text-[10px] font-black text-primary uppercase tracking-[0.2em] mb-1">Sesión en Curso</p>
+                        <h4 className="text-xl font-black italic uppercase tracking-tighter">{todayRoutine.title}</h4>
+                      </div>
+                      <button 
+                        onClick={() => setWorkoutMode(false)}
+                        className="w-10 h-10 rounded-full bg-dark-800 flex items-center justify-center text-gray-400"
+                      >
+                        <X size={20} />
+                      </button>
+                    </div>
+
+                    {/* Progress Bar */}
+                    <div className="mb-8">
+                      <div className="flex justify-between items-center mb-2">
+                        <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">PROGRESO TÉCNICO</span>
+                        <span className="text-[9px] font-black text-primary uppercase tracking-widest">
+                          {Math.round((completedExercises.length / todayRoutine.routine_exercises.length) * 100)}%
+                        </span>
+                      </div>
+                      <div className="h-1.5 w-full bg-dark-900 rounded-full overflow-hidden border border-dark-800">
+                        <motion.div 
+                          className="h-full bg-primary"
+                          initial={{ width: 0 }}
+                          animate={{ width: `${(completedExercises.length / todayRoutine.routine_exercises.length) * 100}%` }}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Exercises List */}
+                    <div className="flex-1 overflow-y-auto space-y-4 pb-32 no-scrollbar custom-scrollbar">
+                      {todayRoutine.routine_exercises.map((re, idx) => (
+                        <div 
+                          key={re.id}
+                          className={`card-dark p-4 flex gap-4 transition-all border-2 ${
+                            completedExercises.includes(re.id) ? 'border-primary/40 bg-primary/5' : 'border-dark-800'
+                          }`}
+                        >
+                          {/* Thumb/Video */}
+                          <div className="relative w-24 h-24 flex-shrink-0 bg-dark-800 rounded-2xl overflow-hidden group">
+                            {re.exercises?.thumbnail_url ? (
+                              <img src={re.exercises.thumbnail_url} className="w-full h-full object-cover" />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center text-gray-700"><Dumbbell size={24} /></div>
+                            )}
+                            {re.exercises?.video_url && (
+                              <button 
+                                onClick={() => setActiveVideo(re.exercises)}
+                                className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                              >
+                                <Play fill="white" size={24} />
+                              </button>
+                            )}
+                          </div>
+
+                          {/* Info */}
+                          <div className="flex-1 min-w-0 flex flex-col justify-between py-1">
+                            <div>
+                               <h5 className="text-[13px] font-black uppercase italic tracking-tighter truncate">{re.exercises?.name}</h5>
+                               <p className="text-[10px] text-gray-500 font-bold uppercase mt-1">{re.sets} SERIES × {re.reps} REPS</p>
+                            </div>
+                            
+                            <div className="flex items-center gap-3">
+                              {re.exercises?.video_url && (
+                                <button 
+                                  onClick={() => setActiveVideo(re.exercises)}
+                                  className="text-[9px] font-black text-primary uppercase tracking-[0.1em] flex items-center gap-1 hover:underline"
+                                >
+                                  <Sparkles size={10} /> Ver Técnica
+                                </button>
+                              )}
+                              <span className="w-1 h-1 bg-dark-800 rounded-full" />
+                              <span className="text-[9px] font-black text-gray-600 uppercase tracking-widest">{re.rest_time} Desc.</span>
+                            </div>
+                          </div>
+
+                          {/* Checkbox */}
+                          <button 
+                            onClick={() => toggleExercise(re.id)}
+                            className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all ${
+                              completedExercises.includes(re.id) 
+                                ? 'bg-primary text-black shadow-lg shadow-primary/20 scale-110' 
+                                : 'bg-dark-900 border border-dark-700 text-dark-700'
+                            }`}
+                          >
+                            <CheckCircle2 size={24} className={completedExercises.includes(re.id) ? '' : 'opacity-20'} />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Footer Finish */}
+                    <div className="absolute bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-black via-black to-transparent">
+                      <button 
+                        onClick={finishWorkout}
+                        disabled={completedExercises.length === 0}
+                        className={`w-full py-5 rounded-[2rem] font-black italic transition-all shadow-2xl ${
+                          completedExercises.length === todayRoutine.routine_exercises.length
+                            ? 'bg-primary text-black shadow-primary/20'
+                            : completedExercises.length > 0
+                              ? 'bg-white text-black'
+                              : 'bg-dark-800 text-gray-600 cursor-not-allowed'
+                        }`}
+                      >
+                        {completedExercises.length === todayRoutine.routine_exercises.length ? (
+                          'CONCLUIR ENTRENAMIENTO'
+                        ) : (
+                          `FINALIZAR SESIÓN (${completedExercises.length}/${todayRoutine.routine_exercises.length})`
+                        )}
+                      </button>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              {/* Video Player Modal */}
+              <AnimatePresence>
+                {activeVideo && (
+                  <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+                    <motion.div 
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      onClick={() => setActiveVideo(null)}
+                      className="absolute inset-0 bg-black/95 backdrop-blur-xl"
+                    />
+                    
+                    <motion.div 
+                      initial={{ scale: 0.9, opacity: 0, y: 20 }}
+                      animate={{ scale: 1, opacity: 1, y: 0 }}
+                      exit={{ scale: 0.9, opacity: 0, y: 20 }}
+                      className="relative w-full max-w-4xl aspect-video bg-black rounded-3xl overflow-hidden shadow-2xl border border-white/10"
+                    >
+                      <button 
+                        onClick={() => setActiveVideo(null)}
+                        className="absolute top-4 right-4 z-10 p-2 bg-black/50 text-white rounded-full hover:bg-black transition-colors"
+                      >
+                        <X size={20} />
+                      </button>
+
+                      <div className="w-full h-full">
+                        {activeVideo.video_url?.includes('storage') ? (
+                          <video 
+                            src={activeVideo.video_url}
+                            className="w-full h-full object-contain"
+                            controls
+                            autoPlay
+                          />
+                        ) : activeVideo.video_url ? (
+                          <iframe 
+                            src={(() => {
+                              const url = activeVideo.video_url;
+                              let videoId = '';
+                              
+                              if (url.includes('youtube.com/watch?v=')) {
+                                videoId = url.split('v=')[1]?.split('&')[0];
+                              } else if (url.includes('youtu.be/')) {
+                                videoId = url.split('youtu.be/')[1]?.split('?')[0];
+                              } else if (url.includes('youtube.com/shorts/')) {
+                                videoId = url.split('/shorts/')[1]?.split('?')[0];
+                              } else if (url.includes('youtube.com/embed/')) {
+                                return url;
+                              }
+
+                              return videoId ? `https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0` : url;
+                            })()}
+                            className="w-full h-full border-0"
+                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                            allowFullScreen
+                          />
+                        ) : (
+                          <div className="w-full h-full flex flex-col items-center justify-center text-gray-500 gap-4">
+                            <Activity size={48} className="animate-pulse" />
+                            <p className="text-sm font-bold uppercase tracking-widest">No hay video disponible</p>
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="absolute bottom-0 inset-x-0 p-8 bg-gradient-to-t from-black via-black/80 to-transparent pointer-events-none">
+                        <h3 className="text-2xl font-black italic uppercase text-white tracking-tighter">{activeVideo.name}</h3>
+                        <p className="text-primary text-[10px] font-black uppercase mt-1 tracking-widest italic">Técnica Correcta • Gym Digital</p>
+                      </div>
+                    </motion.div>
+                  </div>
+                )}
+              </AnimatePresence>
             </motion.div>
           )}
 
@@ -282,6 +538,17 @@ const UserDashboard = ({ user, onLogout }) => {
               exit={{ opacity: 0, scale: 1.05 }}
             >
               <UserSubscription user={user} />
+            </motion.div>
+          )}
+
+          {activeTab === 'profile' && (
+            <motion.div 
+              key="profile"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+            >
+              <ProfileManager user={user} onUpdate={fetchUpdatedUser} />
             </motion.div>
           )}
         </AnimatePresence>
@@ -313,8 +580,9 @@ const UserDashboard = ({ user, onLogout }) => {
         />
         <NavIcon 
           icon={<User size={22} />} 
+          active={activeTab === 'profile'}
           label="PERFIL" 
-          onClick={() => {}} // Futuro perfil
+          onClick={() => setActiveTab('profile')}
         />
       </nav>
     </div>

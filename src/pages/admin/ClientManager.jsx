@@ -9,6 +9,7 @@ const ClientManager = () => {
   const [routines, setRoutines] = useState([]);
   const [levels, setLevels] = useState([]);
   const [subscriptions, setSubscriptions] = useState([]);
+  const [roles, setRoles] = useState([{ name: 'user' }, { name: 'admin' }]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -25,17 +26,23 @@ const ClientManager = () => {
 
   const fetchClients = async () => {
     setLoading(true);
-    const [profilesRes, routinesRes, levelsRes, subsRes] = await Promise.all([
+    const [profilesRes, routinesRes, levelsRes, subsRes, rolesRes] = await Promise.all([
       supabase.from('profiles').select('*, subscription:subscription_id(id, name)').order('created_at', { ascending: false }),
       supabase.from('routines').select('id, title, is_template, client_id').or('client_id.is.null').order('title', { ascending: true }),
       supabase.from('routine_levels').select('*').order('name', { ascending: true }),
-      supabase.from('subscriptions').select('*').order('name', { ascending: true })
+      supabase.from('subscriptions').select('*').order('name', { ascending: true }),
+      supabase.from('system_roles').select('name').order('name', { ascending: true })
     ]);
 
     if (!profilesRes.error) setClients(profilesRes.data);
     if (!routinesRes.error) setRoutines(routinesRes.data);
     if (!levelsRes.error) setLevels(levelsRes.data);
     if (!subsRes.error) setSubscriptions(subsRes.data);
+    
+    if (!rolesRes.error && rolesRes.data.length > 0) {
+      setRoles(rolesRes.data);
+    }
+    
     setLoading(false);
   };
 
@@ -379,8 +386,9 @@ const ClientManager = () => {
                     <div className="space-y-1">
                       <label className="text-[10px] font-bold text-gray-500 uppercase">Rol</label>
                       <select name="role" defaultValue={selectedClient?.role || 'user'} className="w-full bg-dark-900 border border-dark-700 rounded-lg p-2 text-sm uppercase font-bold">
-                        <option value="user">USER</option>
-                        <option value="admin">ADMIN</option>
+                        {roles.map(r => (
+                          <option key={r.name} value={r.name.toLowerCase()}>{r.name.toUpperCase()}</option>
+                        ))}
                       </select>
                     </div>
                     <div className="space-y-1">

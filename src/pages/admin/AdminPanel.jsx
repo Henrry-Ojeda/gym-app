@@ -1,16 +1,29 @@
 import { useState, useEffect } from 'react';
-import { LayoutDashboard, Dumbbell, MessageSquare, Users, Settings, Plus, Layout, Flame, LogOut, Calendar } from 'lucide-react';
+import { LayoutDashboard, Dumbbell, MessageSquare, Users, Settings, Plus, Layout, Flame, LogOut, Calendar, User } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { supabase } from '../../lib/supabaseClient';
 import AdminChatManager from './AdminChatManager';
 import ClientManager from './ClientManager';
 import RoutineManager from './RoutineManager';
 import GlobalAgendaManager from './GlobalAgendaManager';
-import SubscriptionManager from './SubscriptionManager';
+import SettingsManager from './SettingsManager';
+import ProfileManager from '../../components/ProfileManager';
 
 const AdminPanel = ({ user, onLogout }) => {
   const [activeTab, setActiveTab] = useState(() => localStorage.getItem('gym_admin_tab') || 'dashboard');
   const [activeRoutineSubTab, setActiveRoutineSubTab] = useState(() => localStorage.getItem('gym_admin_routine_subtab') || 'programs');
+
+  const fetchUserData = async () => {
+    const { data: { user: authUser } } = await supabase.auth.getUser();
+    if (authUser) {
+      const { data } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', authUser.id)
+        .single();
+      if (data) Object.assign(user, data); // Update local user object
+    }
+  };
 
   useEffect(() => {
     localStorage.setItem('gym_admin_tab', activeTab);
@@ -59,8 +72,8 @@ const AdminPanel = ({ user, onLogout }) => {
     { id: 'users', label: 'Clientes', icon: <Users size={20} /> },
     { id: 'routines', label: 'Rutinas', icon: <Dumbbell size={20} /> },
     { id: 'agenda', label: 'Agenda Global', icon: <Calendar size={20} /> },
-    { id: 'subscriptions', label: 'Suscripciones', icon: <Flame size={20} /> },
     { id: 'chats', label: 'Mensajes', icon: <MessageSquare size={20} /> },
+    { id: 'profile', label: 'Mi Perfil', icon: <User size={20} /> },
     { id: 'settings', label: 'Ajustes', icon: <Settings size={20} /> },
   ];
 
@@ -91,7 +104,16 @@ const AdminPanel = ({ user, onLogout }) => {
           ))}
         </nav>
 
-        <div className="p-4 border-t border-dark-700">
+        <div className="p-4 border-t border-dark-700 text-center">
+          <div className="mb-4 flex items-center gap-3 px-4">
+             <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center border border-primary/20">
+               <span className="text-[10px] font-black italic">{user?.first_name?.[0]}{user?.last_name?.[0]}</span>
+             </div>
+             <div className="text-left">
+               <p className="text-[10px] font-black uppercase tracking-tight">{user?.first_name} {user?.last_name}</p>
+               <p className="text-[8px] text-gray-500 font-bold uppercase">{user?.role}</p>
+             </div>
+          </div>
           <button 
             onClick={onLogout}
             className="w-full text-xs text-gray-500 hover:text-red-500 transition-colors uppercase font-bold tracking-widest"
@@ -200,24 +222,9 @@ const AdminPanel = ({ user, onLogout }) => {
                 Categorías
                 {activeRoutineSubTab === 'categories' && <motion.div layoutId="subtab" className="absolute bottom-0 left-0 w-full h-0.5 bg-primary" />}
               </button>
-              <button 
-                onClick={() => setActiveRoutineSubTab('levels')}
-                className={`text-xs font-bold uppercase tracking-widest pb-2 transition-colors relative ${
-                  activeRoutineSubTab === 'levels' ? 'text-primary' : 'text-gray-500 hover:text-gray-300'
-                }`}
-              >
-                Niveles
-                {activeRoutineSubTab === 'levels' && <motion.div layoutId="subtab" className="absolute bottom-0 left-0 w-full h-0.5 bg-primary" />}
-              </button>
             </div>
             
             <RoutineManager activeRoutineSubTab={activeRoutineSubTab} />
-          </div>
-        )}
-
-        {activeTab === 'subscriptions' && (
-          <div className="animate-in slide-in-from-bottom-4 duration-500">
-            <SubscriptionManager />
           </div>
         )}
 
@@ -231,7 +238,19 @@ const AdminPanel = ({ user, onLogout }) => {
           </div>
         )}
 
-        {activeTab !== 'routines' && activeTab !== 'chats' && activeTab !== 'dashboard' && (
+        {activeTab === 'profile' && (
+          <div className="animate-in slide-in-from-right-4 duration-500">
+            <ProfileManager user={user} onUpdate={fetchUserData} />
+          </div>
+        )}
+
+        {activeTab === 'settings' && (
+          <div className="animate-in slide-in-from-bottom-4 duration-500">
+            <SettingsManager />
+          </div>
+        )}
+
+        {activeTab !== 'routines' && activeTab !== 'chats' && activeTab !== 'dashboard' && activeTab !== 'settings' && activeTab !== 'users' && activeTab !== 'agenda' && activeTab !== 'profile' && (
           <div className="mt-12 card-dark">
             <h2 className="text-xl font-black mb-6 flex items-center gap-2">
               <Layout className="text-primary" size={24} /> VISTA RÁPIDA
