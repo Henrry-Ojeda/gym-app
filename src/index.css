@@ -1,0 +1,37 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-black text-white font-inter;
+  }
+}
+
+.glass {
+  background: rgba(18, 18, 18, 0.7);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.btn-primary {
+  @apply bg-primary text-black font-bold py-3 px-6 rounded-md transition-all hover:scale-105 active:scale-95;
+}
+
+.card-dark {
+  @apply bg-dark-800 border border-dark-700 rounded-xl p-6;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  @apply bg-dark-900;
+}
+::-webkit-scrollbar-thumb {
+  @apply bg-dark-700 rounded-full;
+}
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-primary;
+}
